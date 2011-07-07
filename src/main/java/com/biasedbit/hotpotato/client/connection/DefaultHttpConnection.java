@@ -33,6 +33,7 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
 import com.biasedbit.hotpotato.client.HttpRequestContext;
 import com.biasedbit.hotpotato.client.timeout.TimeoutManager;
 import com.biasedbit.hotpotato.request.HttpRequestFuture;
+import com.biasedbit.hotpotato.request.HttpRequestFutureListener;
 
 /**
  * Non-pipelining implementation of {@link HttpConnection} interface.
@@ -51,7 +52,7 @@ import com.biasedbit.hotpotato.request.HttpRequestFuture;
  *
  * @author <a href="http://bruno.biasedbit.com/">Bruno de Carvalho</a>
  */
-public class DefaultHttpConnection extends SimpleChannelUpstreamHandler implements HttpConnection {
+public class DefaultHttpConnection extends SimpleChannelUpstreamHandler implements HttpConnection, HttpRequestFutureListener {
 
     // configuration defaults -----------------------------------------------------------------------------------------
 
@@ -282,6 +283,8 @@ public class DefaultHttpConnection extends SimpleChannelUpstreamHandler implemen
             this.listener.requestFinished(this, context);
             return true;
         }
+        
+        context.getFuture().addListener(this);
 
         synchronized (this.mutex) {
             // This implementation only allows one execution at a time. If requests are performed during the period in
@@ -495,4 +498,11 @@ public class DefaultHttpConnection extends SimpleChannelUpstreamHandler implemen
                 .append('(').append(this.host).append(':').append(this.port)
                 .append(")}").toString();
     }
+
+	public void operationComplete(HttpRequestFuture future) throws Exception
+	{
+		if(future.isCancelled()) {
+			terminate();
+		}
+	}
 }
