@@ -154,7 +154,7 @@ public class DummyHttpServer {
                 ChannelPipeline pipeline = Channels.pipeline();
 
                 if (useSsl) {
-                    SSLEngine engine = SecureChatSslContextFactory.getServerContext().createSSLEngine();
+                    SSLEngine engine = SecureChatSslContextFactory.getInstance().getServerContext().createSSLEngine();
                     engine.setUseClientMode(false);
                     pipeline.addLast("ssl", new SslHandler(engine));
                 }
@@ -342,3 +342,4 @@ public class DummyHttpServer {
         });
     }
 }
+

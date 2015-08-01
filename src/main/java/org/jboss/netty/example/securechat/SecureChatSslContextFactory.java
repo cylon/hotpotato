@@ -35,17 +35,26 @@ import java.security.Security;
 public class SecureChatSslContextFactory {
 
     private static final String PROTOCOL = "TLS";
-    private static final SSLContext SERVER_CONTEXT;
-    private static final SSLContext CLIENT_CONTEXT;
 
-    static {
+    private final SSLContext serverContext;
+    private final SSLContext clientContext;
+
+    private static final SecureChatSslContextFactory INSTANCE = new SecureChatSslContextFactory();
+
+    public static final SecureChatSslContextFactory getInstance()
+    {
+        return INSTANCE;
+    }
+
+    public SecureChatSslContextFactory()
+    {
         String algorithm = Security.getProperty("ssl.KeyManagerFactory.algorithm");
         if (algorithm == null) {
             algorithm = "SunX509";
         }
 
-        SSLContext serverContext;
-        SSLContext clientContext;
+        SSLContext tmpServerContext;
+        SSLContext tmpClientContext;
         try {
             KeyStore ks = KeyStore.getInstance("JKS");
             ks.load(SecureChatKeyStore.asInputStream(), SecureChatKeyStore.getKeyStorePassword());
@@ -55,28 +64,29 @@ public class SecureChatSslContextFactory {
             kmf.init(ks, SecureChatKeyStore.getCertificatePassword());
 
             // Initialize the SSLContext to work with our key managers.
-            serverContext = SSLContext.getInstance(PROTOCOL);
-            serverContext.init(kmf.getKeyManagers(), SecureChatTrustManagerFactory.getTrustManagers(), null);
+            tmpServerContext = SSLContext.getInstance(PROTOCOL);
+            tmpServerContext.init(kmf.getKeyManagers(), SecureChatTrustManagerFactory.getTrustManagers(), null);
         } catch (Exception e) {
             throw new Error("Failed to initialize the server-side SSLContext", e);
         }
 
         try {
-            clientContext = SSLContext.getInstance(PROTOCOL);
-            clientContext.init(null, SecureChatTrustManagerFactory.getTrustManagers(), null);
+            tmpClientContext = SSLContext.getInstance(PROTOCOL);
+            tmpClientContext.init(null, SecureChatTrustManagerFactory.getTrustManagers(), null);
         } catch (Exception e) {
             throw new Error("Failed to initialize the client-side SSLContext", e);
         }
 
-        SERVER_CONTEXT = serverContext;
-        CLIENT_CONTEXT = clientContext;
+        serverContext = tmpServerContext;
+        clientContext = tmpClientContext;
     }
 
-    public static SSLContext getServerContext() {
-        return SERVER_CONTEXT;
+    public SSLContext getServerContext() {
+        return serverContext;
     }
 
-    public static SSLContext getClientContext() {
-        return CLIENT_CONTEXT;
+    public SSLContext getClientContext() {
+        return clientContext;
     }
 }
+

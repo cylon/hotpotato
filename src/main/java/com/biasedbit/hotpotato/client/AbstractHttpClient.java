@@ -30,6 +30,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLContext;
 
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.channel.ChannelFactory;
@@ -41,7 +42,6 @@ import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.oio.OioClientSocketChannelFactory;
-import org.jboss.netty.example.securechat.SecureChatSslContextFactory;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpClientCodec;
 import org.jboss.netty.handler.codec.http.HttpContentCompressor;
@@ -192,6 +192,7 @@ public abstract class AbstractHttpClient implements HttpClient, HttpConnectionLi
     protected CountDownLatch eventConsumerLatch;
     protected volatile boolean terminate;
     protected boolean internalTimeoutManager;
+    protected SSLContext sslContext = null;
 
     // constructors ---------------------------------------------------------------------------------------------------
 
@@ -261,15 +262,18 @@ public abstract class AbstractHttpClient implements HttpClient, HttpConnectionLi
             public ChannelPipeline getPipeline() throws Exception {
                 ChannelPipeline pipeline = Channels.pipeline();
                 if (useSsl) {
-                    SSLEngine engine = SecureChatSslContextFactory.getServerContext().createSSLEngine();
+                    if (null == sslContext) {
+                        throw new IllegalStateException(
+                            "Cannot establish ssl connection because no SSLContext was provided"
+                        );
+                    }
+                    SSLEngine engine = sslContext.createSSLEngine();
                     engine.setUseClientMode(true);
                     pipeline.addLast("ssl", new SslHandler(engine));
                 }
-
                 if (requestCompressionLevel > 0) {
                     pipeline.addLast("deflater", new HttpContentCompressor(requestCompressionLevel));
                 }
-
                 pipeline.addLast("codec", new HttpClientCodec(4096, 8192, requestChunkSize));
                 if (autoInflate) {
                     pipeline.addLast("inflater", new HttpContentDecompressor());
@@ -635,17 +639,15 @@ public abstract class AbstractHttpClient implements HttpClient, HttpConnectionLi
                 bootstrap.setOption("reuseAddress", true);
                 bootstrap.setOption("connectTimeoutMillis", connectionTimeoutInMillis);
                 bootstrap.setPipeline(pipeline);
-                bootstrap.connect(new InetSocketAddress(context.getHost(), context.getPort()))
-                        .addListener(new ChannelFutureListener() {
-
-                            public void operationComplete(final ChannelFuture future) throws Exception {
-                                if (future.isSuccess()) {
-                                    // Don't even bother checking if client was already instructed to terminate since
-                                    // CleanupChannelGroup takes care of that.
-                                    channelGroup.add(future.getChannel());
-                                }
-                            }
-                        });
+                bootstrap.connect(new InetSocketAddress(context.getHost(), context.getPort())).addListener(new ChannelFutureListener() {
+                    public void operationComplete(final ChannelFuture future) throws Exception {
+                        if (future.isSuccess()) {
+                            // Don't even bother checking if client was already instructed to terminate since
+                            // CleanupChannelGroup takes care of that.
+                            channelGroup.add(future.getChannel());
+                        }
+                    }
+                });
             }
         });
     }
@@ -670,6 +672,16 @@ public abstract class AbstractHttpClient implements HttpClient, HttpConnectionLi
             throw new IllegalStateException("Cannot modify property after initialization");
         }
         this.useSsl = useSsl;
+    }
+
+    public SSLContext getSSLContext()
+    {
+        return sslContext;
+    }
+
+    public void setSSLContext(SSLContext sslContext)
+    {
+        this.sslContext = sslContext;
     }
 
     public int getRequestCompressionLevel() {
@@ -1064,3 +1076,4 @@ public abstract class AbstractHttpClient implements HttpClient, HttpConnectionLi
         return this.getClass().getSimpleName() + '@' + Integer.toHexString(this.hashCode());
     }
 }
+

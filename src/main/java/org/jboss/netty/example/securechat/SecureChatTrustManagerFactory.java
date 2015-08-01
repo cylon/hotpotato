@@ -72,3 +72,4 @@ public class SecureChatTrustManagerFactory extends TrustManagerFactorySpi {
         // Unused
     }
 }
+
